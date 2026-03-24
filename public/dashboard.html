@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - Facturación Premium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container animate-up">
+        <header class="dashboard-header">
+            <div class="company-info" id="companyHeader">
+                <img src="assets/logo.png" alt="Empresa Logo" id="headerLogo">
+                <div>
+                    <h2 id="companyName">Cargando...</h2>
+                    <small id="companyRuc" style="color: var(--secondary)">RUC: ---</small>
+                </div>
+            </div>
+            <div class="user-controls">
+                <a href="users.html" id="userMgmtBtn" class="btn btn-secondary" style="display:none; width: auto; padding: 0.5rem 1rem; text-decoration:none; font-size: 0.875rem;">
+                    <i class="fas fa-users"></i> Gestión Usuarios
+                </a>
+                
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div>
+                        <span id="adminBadge" style="display:none; background:var(--warning); color:white; padding:1px 6px; border-radius:4px; font-size:9px; margin-bottom:2px; text-align:center;">ADMIN</span>
+                        <strong id="userName" style="font-size: 0.9rem;">---</strong>
+                    </div>
+                </div>
+
+                <button class="btn-logout" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </header>
+
+        <section class="glass-card">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-dark)">
+                <i class="fas fa-search-plus"></i> Filtros de Búsqueda
+            </h3>
+            <form id="filterForm">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label for="tipo">Tipo de Documento</label>
+                        <select id="tipo">
+                            <option value="">Todos</option>
+                            <option value="01">Factura</option>
+                            <option value="03">Boleta</option>
+                            <option value="07">Nota de Crédito</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="serie">Serie</label>
+                        <input type="text" id="serie" placeholder="Ej: F001">
+                    </div>
+                    <div class="form-group">
+                        <label for="numero">Número</label>
+                        <input type="text" id="numero" placeholder="Ej: 0001">
+                    </div>
+                    <div class="form-group">
+                        <label for="estado">Estado</label>
+                        <select id="estado">
+                            <option value="">Todos</option>
+                            <option value="Aceptado">Aceptado</option>
+                            <option value="Rechazado">Rechazado</option>
+                            <option value="Pendiente">Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top: 1.5rem;">
+                    <button type="reset" class="btn btn-secondary" style="width:auto">Limpiar</button>
+                    <button type="submit" class="btn btn-primary" style="width:auto">Aplicar Filtros</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="glass-card">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Emisión</th>
+                            <th>Emisor / Receptor</th>
+                            <th>Estado</th>
+                            <th style="text-align:right">Total</th>
+                            <th style="text-align:center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentTableBody">
+                        <!-- Content via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
