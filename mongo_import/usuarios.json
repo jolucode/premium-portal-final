@@ -1,0 +1,14 @@
+[
+  {
+    "username": "admin_ventura",
+    "password": "$2a$10$76y6.C2vS8x.x4u8p0w3u.p0w3u.p0w3u.p0w3u.p0w3u.p0w3u.",
+    "ruc_empresa": "20510910517",
+    "role": "admin"
+  },
+  {
+    "username": "admin_logistica",
+    "password": "$2a$10$76y6.C2vS8x.x4u8p0w3u.p0w3u.p0w3u.p0w3u.p0w3u.p0w3u.",
+    "ruc_empresa": "20601234567",
+    "role": "admin"
+  }
+]

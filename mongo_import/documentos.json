@@ -1,0 +1,55 @@
+[
+  {
+    "tipo": "01",
+    "serie": "F001",
+    "numero": "00000001",
+    "fecha": { "$date": "2026-03-20T00:00:00Z" },
+    "monto": 1500.0,
+    "moneda": "PEN",
+    "ruc_emisor": "20510910517",
+    "ruc_receptor": "20445566778",
+    "estado": "Aceptado",
+    "pdf_path": "/downloads/F001-1.pdf",
+    "xml_path": "/downloads/F001-1.xml",
+    "cdr_path": "/downloads/F001-1.cdr"
+  },
+  {
+    "tipo": "03",
+    "serie": "B001",
+    "numero": "00000123",
+    "fecha": { "$date": "2026-03-21T00:00:00Z" },
+    "monto": 120.5,
+    "moneda": "PEN",
+    "ruc_emisor": "20510910517",
+    "ruc_receptor": "10223344556",
+    "estado": "Aceptado",
+    "pdf_path": "/downloads/B001-123.pdf",
+    "xml_path": "/downloads/B001-123.xml"
+  },
+  {
+    "tipo": "01",
+    "serie": "F002",
+    "numero": "00000999",
+    "fecha": { "$date": "2026-03-22T00:00:00Z" },
+    "monto": 8500.0,
+    "moneda": "PEN",
+    "ruc_emisor": "20601234567",
+    "ruc_receptor": "20101112131",
+    "estado": "Aceptado",
+    "pdf_path": "/downloads/F002-999.pdf",
+    "xml_path": "/downloads/F002-999.xml",
+    "cdr_path": "/downloads/F002-999.cdr"
+  },
+  {
+    "tipo": "07",
+    "serie": "FC02",
+    "numero": "00000005",
+    "fecha": { "$date": "2026-03-23T00:00:00Z" },
+    "monto": 450.0,
+    "moneda": "USD",
+    "ruc_emisor": "20601234567",
+    "ruc_receptor": "20556677889",
+    "estado": "Pendiente",
+    "xml_path": "/downloads/FC02-5.xml"
+  }
+]

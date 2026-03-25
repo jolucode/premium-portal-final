@@ -1,60 +1,101 @@
-const mysql = require('mysql2/promise');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-async function seed() {
-    const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || '127.0.0.1',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASS || '',
-        database: process.env.DB_NAME || 'multiempresaportal'
-    });
+// Definir esquemas para el seed
+const EmpresaSchema = new mongoose.Schema({
+    ruc: String,
+    razon_social: String,
+    logo: String
+});
 
+const UsuarioSchema = new mongoose.Schema({
+    username: String,
+    password: { type: String, required: true },
+    ruc_empresa: String,
+    role: { type: String, default: 'user' }
+});
+
+const DocumentoSchema = new mongoose.Schema({
+    tipo: String,
+    serie: String,
+    numero: String,
+    fecha: Date,
+    monto: Number,
+    moneda: String,
+    ruc_emisor: String,
+    ruc_receptor: String,
+    estado: String,
+    pdf_path: String,
+    xml_path: String,
+    cdr_path: String
+});
+
+const Empresa = mongoose.model('Empresa', EmpresaSchema);
+const Usuario = mongoose.model('Usuario', UsuarioSchema);
+const Documento = mongoose.model('Documento', DocumentoSchema);
+
+async function seed() {
+    const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27014/premium_portal';
+    
     try {
-        // Clean tables
-        await connection.query('SET FOREIGN_KEY_CHECKS = 0');
-        await connection.query('TRUNCATE documentos');
-        await connection.query('TRUNCATE usuarios');
-        await connection.query('TRUNCATE empresas');
-        await connection.query('SET FOREIGN_KEY_CHECKS = 1');
+        await mongoose.connect(MONGO_URI);
+        console.log('Connected to MongoDB for seeding...');
+
+        // Clean collections
+        await Empresa.deleteMany({});
+        await Usuario.deleteMany({});
+        await Documento.deleteMany({});
+        console.log('Collections cleared.');
 
         // Seed Empresas
-        await connection.query('INSERT INTO empresas (ruc, razon_social, logo) VALUES (?, ?, ?)', 
-            ['20510910517', 'VENTURA SOLUCIONES S.A.C.', 'assets/logo.png']);
-        await connection.query('INSERT INTO empresas (ruc, razon_social, logo) VALUES (?, ?, ?)', 
-            ['20601234567', 'CORPORACION LOGISTICA S.A.C.', 'assets/logo_logistica.png']);
+        const empresas = await Empresa.insertMany([
+            { ruc: '20510910517', razon_social: 'VENTURA SOLUCIONES S.A.C.', logo: 'assets/logo.png' },
+            { ruc: '20601234567', razon_social: 'CORPORACION LOGISTICA S.A.C.', logo: 'assets/logo_logistica.png' }
+        ]);
+        console.log('Empresas seeded.');
 
         // Seed Users
-        const passVentura = await bcrypt.hash('20510910517', 10); // RUC as password
+        const passVentura = await bcrypt.hash('20510910517', 10);
         const passLogistica = await bcrypt.hash('20601234567', 10);
-        
-        // Add a standard employee
         const passEmployee = await bcrypt.hash('ventura', 10);
 
-        await connection.query('INSERT INTO usuarios (username, password, ruc_empresa) VALUES (?, ?, ?)', 
-            ['admin_ventura', passEmployee, '20510910517']);
-        await connection.query('INSERT INTO usuarios (username, password, ruc_empresa) VALUES (?, ?, ?)', 
-            ['admin_logistica', passLogistica, '20601234567']);
+        await Usuario.insertMany([
+            { username: 'admin_ventura', password: passEmployee, ruc_empresa: '20510910517', role: 'admin' },
+            { username: 'admin_logistica', password: passLogistica, ruc_empresa: '20601234567', role: 'admin' }
+        ]);
+        console.log('Users seeded.');
 
-        // Seed Documents (Company 1) with File Paths
-        await connection.query('INSERT INTO documentos (tipo, serie, numero, fecha, monto, moneda, ruc_emisor, ruc_receptor, estado, pdf_path, xml_path, cdr_path) VALUES ?', 
-            [[
-                ['01', 'F001', '00000001', '2026-03-20', 1500.00, 'PEN', '20510910517', '20445566778', 'Aceptado', '/downloads/F001-1.pdf', '/downloads/F001-1.xml', '/downloads/F001-1.cdr'],
-                ['03', 'B001', '00000123', '2026-03-21', 120.50, 'PEN', '20510910517', '10223344556', 'Aceptado', '/downloads/B001-123.pdf', '/downloads/B001-123.xml', null]
-            ]]);
+        // Seed Documents
+        await Documento.insertMany([
+            {
+                tipo: '01', serie: 'F001', numero: '00000001', fecha: new Date('2026-03-20'),
+                monto: 1500.00, moneda: 'PEN', ruc_emisor: '20510910517', ruc_receptor: '20445566778',
+                estado: 'Aceptado', pdf_path: '/downloads/F001-1.pdf', xml_path: '/downloads/F001-1.xml', cdr_path: '/downloads/F001-1.cdr'
+            },
+            {
+                tipo: '03', serie: 'B001', numero: '00000123', fecha: new Date('2026-03-21'),
+                monto: 120.50, moneda: 'PEN', ruc_emisor: '20510910517', ruc_receptor: '10223344556',
+                estado: 'Aceptado', pdf_path: '/downloads/B001-123.pdf', xml_path: '/downloads/B001-123.xml'
+            },
+            {
+                tipo: '01', serie: 'F002', numero: '00000999', fecha: new Date('2026-03-22'),
+                monto: 8500.00, moneda: 'PEN', ruc_emisor: '20601234567', ruc_receptor: '20101112131',
+                estado: 'Aceptado', pdf_path: '/downloads/F002-999.pdf', xml_path: '/downloads/F002-999.xml', cdr_path: '/downloads/F002-999.cdr'
+            },
+            {
+                tipo: '07', serie: 'FC02', numero: '00000005', fecha: new Date('2026-03-23'),
+                monto: 450.00, moneda: 'USD', ruc_emisor: '20601234567', ruc_receptor: '20556677889',
+                estado: 'Pendiente', xml_path: '/downloads/FC02-5.xml'
+            }
+        ]);
+        console.log('Documents seeded.');
 
-        // Seed Documents (Company 2)
-        await connection.query('INSERT INTO documentos (tipo, serie, numero, fecha, monto, moneda, ruc_emisor, ruc_receptor, estado, pdf_path, xml_path, cdr_path) VALUES ?', 
-            [[
-                ['01', 'F002', '00000999', '2026-03-22', 8500.00, 'PEN', '20601234567', '20101112131', 'Aceptado', '/downloads/F002-999.pdf', '/downloads/F002-999.xml', '/downloads/F002-999.cdr'],
-                ['07', 'FC02', '00000005', '2026-03-23', 450.00, 'USD', '20601234567', '20556677889', 'Pendiente', null, '/downloads/FC02-5.xml', null]
-            ]]);
-
-        console.log('Database seeded successfully with file paths!');
+        console.log('Database seeded successfully with MongoDB!');
     } catch (err) {
         console.error('Error seeding database:', err);
     } finally {
-        await connection.end();
+        await mongoose.connection.close();
     }
 }
 

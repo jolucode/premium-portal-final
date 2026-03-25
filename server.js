@@ -1,5 +1,5 @@
 const express = require('express');
-const mysql = require('mysql2/promise');
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
@@ -11,24 +11,43 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
 
+// Modelos de MongoDB (Mongoose)
+const EmpresaSchema = new mongoose.Schema({
+    ruc: { type: String, required: true, unique: true },
+    razon_social: String,
+    logo: String
+});
+
+const UsuarioSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    ruc_empresa: { type: String, required: true },
+    role: { type: String, default: 'user' }
+});
+
+const DocumentoSchema = new mongoose.Schema({
+    tipo: String,
+    serie: String,
+    numero: String,
+    fecha: Date,
+    monto: Number,
+    moneda: String,
+    ruc_emisor: String,
+    ruc_receptor: String,
+    estado: String,
+    pdf_path: String,
+    xml_path: String,
+    cdr_path: String
+});
+
+const Empresa = mongoose.model('Empresa', EmpresaSchema);
+const Usuario = mongoose.model('Usuario', UsuarioSchema);
+const Documento = mongoose.model('Documento', DocumentoSchema);
+
 // Redirigir raíz a login
 app.get('/', (req, res) => {
     res.redirect('/login.html');
 });
-
-let pool;
-
-async function initDB() {
-    pool = mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASS,
-        database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
-    });
-}
 
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
@@ -54,13 +73,12 @@ app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     
     try {
-        // Special case: RUC as login/password
+        // Caso especial: RUC como login/password (Admin de Empresa)
         if (username === password) {
-            const [empRows] = await pool.query('SELECT * FROM empresas WHERE ruc = ?', [username]);
-            if (empRows.length > 0) {
-                const emp = empRows[0];
+            const emp = await Empresa.findOne({ ruc: username });
+            if (emp) {
                 const token = jwt.sign({ 
-                    id: 0, 
+                    id: 'admin', 
                     username: 'Administrador', 
                     ruc: emp.ruc,
                     empresa: emp.razon_social,
@@ -80,22 +98,21 @@ app.post('/api/login', async (req, res) => {
             }
         }
 
-        // Standard user login
-        const [rows] = await pool.query('SELECT u.*, e.razon_social, e.logo FROM usuarios u JOIN empresas e ON u.ruc_empresa = e.ruc WHERE u.username = ?', [username]);
+        // Login de usuario estándar
+        const user = await Usuario.findOne({ username });
+        if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
         
-        if (rows.length === 0) return res.status(401).json({ error: 'Usuario no encontrado' });
-        
-        const user = rows[0];
         const validPassword = await bcrypt.compare(password, user.password);
-        
         if (!validPassword) return res.status(401).json({ error: 'Contraseña incorrecta' });
         
+        const emp = await Empresa.findOne({ ruc: user.ruc_empresa });
+        
         const token = jwt.sign({ 
-            id: user.id, 
+            id: user._id, 
             username: user.username, 
             ruc: user.ruc_empresa,
-            empresa: user.razon_social,
-            role: 'user'
+            empresa: emp ? emp.razon_social : 'Empresa Desconocida',
+            role: user.role || 'user'
         }, process.env.JWT_SECRET, { expiresIn: '8h' });
         
         res.json({ 
@@ -103,9 +120,9 @@ app.post('/api/login', async (req, res) => {
             user: { 
                 username: user.username, 
                 ruc: user.ruc_empresa, 
-                empresa: user.razon_social,
-                logo: user.logo,
-                role: 'user'
+                empresa: emp ? emp.razon_social : 'Empresa Desconocida',
+                logo: emp ? emp.logo : null,
+                role: user.role || 'user'
             } 
         });
     } catch (err) {
@@ -120,16 +137,15 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
     const { tipo, serie, numero, estado } = req.query;
 
     try {
-        let query = 'SELECT * FROM documentos WHERE (ruc_emisor = ? OR ruc_receptor = ?)';
-        let params = [ruc, ruc];
+        let filter = { $or: [{ ruc_emisor: ruc }, { ruc_receptor: ruc }] };
 
-        if (tipo) { query += ' AND tipo = ?'; params.push(tipo); }
-        if (serie) { query += ' AND serie LIKE ?'; params.push(`%${serie}%`); }
-        if (numero) { query += ' AND numero LIKE ?'; params.push(`%${numero}%`); }
-        if (estado) { query += ' AND estado = ?'; params.push(estado); }
+        if (tipo) filter.tipo = tipo;
+        if (serie) filter.serie = { $regex: serie, $options: 'i' };
+        if (numero) filter.numero = { $regex: numero, $options: 'i' };
+        if (estado) filter.estado = estado;
 
-        const [rows] = await pool.query(query + ' ORDER BY fecha DESC', params);
-        res.json(rows);
+        const docs = await Documento.find(filter).sort({ fecha: -1 });
+        res.json(docs);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Error al consultar documentos' });
@@ -139,8 +155,8 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
 // User Management Routes
 app.get('/api/users', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT id, username, ruc_empresa FROM usuarios WHERE ruc_empresa = ?', [req.user.ruc]);
-        res.json(rows);
+        const users = await Usuario.find({ ruc_empresa: req.user.ruc }, 'username ruc_empresa role');
+        res.json(users.map(u => ({ id: u._id, username: u.username, ruc_empresa: u.ruc_empresa })));
     } catch (err) {
         res.status(500).json({ error: 'Error al listar usuarios' });
     }
@@ -152,19 +168,24 @@ app.post('/api/users', authenticateToken, isAdmin, async (req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        await pool.query('INSERT INTO usuarios (username, password, ruc_empresa) VALUES (?, ?, ?)', 
-            [username, hashedPassword, req.user.ruc]);
+        const newUser = new Usuario({
+            username,
+            password: hashedPassword,
+            ruc_empresa: req.user.ruc,
+            role: 'user'
+        });
+        await newUser.save();
         res.status(201).json({ message: 'Usuario creado con éxito' });
     } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'El nombre de usuario ya existe' });
+        if (err.code === 11000) return res.status(400).json({ error: 'El nombre de usuario ya existe' });
         res.status(500).json({ error: 'Error al crear usuario' });
     }
 });
 
 app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [result] = await pool.query('DELETE FROM usuarios WHERE id = ? AND ruc_empresa = ?', [req.params.id, req.user.ruc]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const result = await Usuario.deleteOne({ _id: req.params.id, ruc_empresa: req.user.ruc });
+        if (result.deletedCount === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
         res.json({ message: 'Usuario eliminado' });
     } catch (err) {
         res.status(500).json({ error: 'Error al eliminar usuario' });
@@ -172,8 +193,13 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-initDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server running on http://localhost:${PORT}`);
-    });
-});
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27014/premium_portal';
+
+mongoose.connect(MONGO_URI)
+    .then(() => {
+        console.log('Connected to MongoDB');
+        app.listen(PORT, () => {
+            console.log(`Server running on http://localhost:${PORT}`);
+        });
+    })
+    .catch(err => console.error('Could not connect to MongoDB', err));
