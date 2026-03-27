@@ -128,10 +128,67 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(14, 165, 
     align-items: center;
     margin-bottom: 2rem;
     border: 1px solid var(--glass-border);
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
-.company-info { display: flex; align-items: center; gap: 1rem; }
-.company-info img { height: 40px; }
+.company-info { display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 200px; }
+.company-info img { height: 40px; max-width: 120px; object-fit: contain; }
+
+.user-controls { 
+    display: flex; 
+    align-items: center; 
+    gap: 1rem; 
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    
+    .dashboard-header {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+
+    .company-info {
+        flex-direction: column;
+        margin-bottom: 0.5rem;
+    }
+
+    .user-controls {
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .user-profile {
+        padding: 0.4rem 0.8rem;
+    }
+
+    .user-profile strong {
+        display: none; /* Ocultar nombre en móviles muy pequeños si es necesario */
+    }
+
+    #userMgmtBtn span {
+        display: none; /* Ocultar texto del botón gestión en móviles */
+    }
+    
+    .btn-logout span {
+        display: none;
+    }
+    
+    .btn-logout {
+        padding: 0.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .user-profile strong {
+        display: none;
+    }
+}
 
 /* Dashboard Content */
 .glass-card {
