@@ -81,13 +81,30 @@ app.post('/api/login', async (req, res) => {
 // Documents Route
 app.get('/api/documents', authenticateToken, async (req, res) => {
     const ruc = req.user.ruc;
-    const { tipo, serie, numero, estado } = req.query;
+    const { tipo, search, estado } = req.query;
     try {
         let filter = { $or: [{ ruc_emisor: ruc }, { ruc_receptor: ruc }] };
         if (tipo) filter.tipo = tipo;
-        if (serie) filter.serie = { $regex: serie, $options: 'i' };
-        if (numero) filter.numero = { $regex: numero, $options: 'i' };
         if (estado) filter.estado = estado;
+
+        // Búsqueda inteligente de Serie y Número
+        if (search) {
+            const parts = search.split('-');
+            if (parts.length === 2) {
+                // Caso: "F001-0001"
+                filter.serie = { $regex: parts[0], $options: 'i' };
+                filter.numero = { $regex: parts[1], $options: 'i' };
+            } else {
+                // Caso: Solo "F001" o solo "1"
+                filter.$and = [
+                    { $or: [
+                        { serie: { $regex: search, $options: 'i' } },
+                        { numero: { $regex: search, $options: 'i' } }
+                    ]}
+                ];
+            }
+        }
+
         const docs = await Documento.find(filter).sort({ fecha: -1 });
         res.json(docs);
     } catch (err) {

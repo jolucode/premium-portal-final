@@ -33,8 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function getFilterParams() {
         return new URLSearchParams({
             tipo: document.getElementById('tipo').value,
-            serie: document.getElementById('serie').value,
-            numero: document.getElementById('numero').value,
+            search: document.getElementById('busqueda').value,
             estado: document.getElementById('estado').value
         });
     }
@@ -52,9 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('tipo').addEventListener('change', applyFilters);
     document.getElementById('estado').addEventListener('change', applyFilters);
 
-    // Inputs de texto: debounce 400ms mientras escribe
-    document.getElementById('serie').addEventListener('input', debouncedApply);
-    document.getElementById('numero').addEventListener('input', debouncedApply);
+    // Input de búsqueda: debounce 400ms mientras escribe
+    document.getElementById('busqueda').addEventListener('input', debouncedApply);
 
     // Botón limpiar: resetear y recargar
     filterForm.querySelector('button[type="reset"]').addEventListener('click', () => {
@@ -103,18 +101,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const row = document.createElement('tr');
             row.className = 'doc-row animate-up';
             row.innerHTML = `
-                <td>
-                    <div style="font-weight:600">${doc.serie}-${doc.numero}</div>
-                    <small style="color:var(--secondary)">${getTipoDesc(doc.tipo)}</small>
+                <td data-label="Documento">
+                    <div class="cell-info">
+                        <div style="font-weight:700; color:var(--primary-dark)">${doc.serie}-${doc.numero}</div>
+                        <small style="color:var(--secondary); font-weight:500">${getTipoDesc(doc.tipo)}</small>
+                    </div>
                 </td>
-                <td>${new Date(doc.fecha).toLocaleDateString()}</td>
-                <td>
-                    <div style="font-size:0.875rem">Emisor: ${doc.ruc_emisor}</div>
-                    <div style="font-size:0.875rem">Receptor: ${doc.ruc_receptor}</div>
+                <td data-label="Emisión"><span>${new Date(doc.fecha).toLocaleDateString()}</span></td>
+                <td data-label="Entidades">
+                    <div class="cell-info">
+                        <div style="font-size:0.75rem"><strong>Emisor:</strong> ${doc.ruc_emisor}</div>
+                        <div style="font-size:0.75rem"><strong>Recep:</strong> ${doc.ruc_receptor}</div>
+                    </div>
                 </td>
-                <td><span class="badge badge-success">${doc.estado}</span></td>
-                <td style="text-align:right"><strong>${doc.moneda} ${parseFloat(doc.monto).toFixed(2)}</strong></td>
-                <td style="text-align:center">
+                <td data-label="Estado"><span class="badge badge-success">${doc.estado}</span></td>
+                <td data-label="Total" style="text-align:right"><strong>${doc.moneda} ${parseFloat(doc.monto).toFixed(2)}</strong></td>
+                <td data-label="Acciones">
                     <div class="action-btn-group">
                         <button class="icon-btn icon-pdf" ${doc.pdf_path ? '' : 'disabled'} onclick="downloadFile('${doc.pdf_path}')" title="Descargar PDF">
                             <i class="fas fa-file-pdf"></i>
