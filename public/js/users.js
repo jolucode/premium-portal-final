@@ -77,7 +77,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td><strong>${u.username}</strong></td>
                 <td>${u.ruc_empresa}</td>
                 <td style="text-align:center">
-                    <button class="btn btn-secondary" style="width:auto; color:var(--danger)" onclick="deleteUser(${u.id})">
+                    <button class="btn btn-secondary" style="width:auto; color:var(--primary); margin-right:0.5rem;" onclick="openEditModal('${u.id}', '${u.username}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-secondary" style="width:auto; color:var(--danger)" onclick="deleteUser('${u.id}')">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -85,6 +88,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             userTableBody.appendChild(row);
         });
     }
+
+    window.openEditModal = (id, username) => {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('editUsername').value = username;
+        document.getElementById('editPassword').value = '';
+        document.getElementById('editModal').style.display = 'flex';
+    };
+
+    window.closeEditModal = () => {
+        document.getElementById('editModal').style.display = 'none';
+    };
+
+    const editUserForm = document.getElementById('editUserForm');
+    editUserForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editUserId').value;
+        const username = document.getElementById('editUsername').value;
+        const password = document.getElementById('editPassword').value;
+
+        const body = { username };
+        if (password) body.password = password;
+
+        const response = await fetch(`/api/users/${id}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            closeEditModal();
+            fetchUsers();
+        } else {
+            alert('Error al actualizar');
+        }
+    });
 
     window.deleteUser = async (id) => {
         if (!confirm('¿Está seguro de eliminar este usuario?')) return;

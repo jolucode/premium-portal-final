@@ -71,6 +71,30 @@
         </div>
     </div>
 
+    <!-- Edit User Modal -->
+    <div id="editModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="glass-card" style="width:400px; padding:2rem;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary-dark)">
+                <i class="fas fa-user-edit"></i> Editar Usuario
+            </h3>
+            <form id="editUserForm">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label for="editUsername">Nombre de Usuario</label>
+                    <input type="text" id="editUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPassword">Nueva Contraseña (opcional)</label>
+                    <input type="password" id="editPassword" placeholder="Dejar en blanco para no cambiar">
+                </div>
+                <div style="display:flex; gap:1rem;">
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="js/users.js"></script>
 </body>
 </html>
