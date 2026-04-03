@@ -90,9 +90,9 @@ function generarDocumento(rucFijo = null) {
         ruc_emisor: emisor.ruc,
         ruc_receptor: receptor,
         estado: estado,
-        pdf_path: Math.random() > 0.1 ? `/downloads/${serie}-${numero}.pdf` : null,
-        xml_path: Math.random() > 0.05 ? `/downloads/${serie}-${numero}.xml` : null,
-        cdr_path: Math.random() > 0.3 ? `/downloads/${serie}-${numero}.cdr` : null
+        pdf_path: Math.random() > 0.1 ? `/downloads/${emisor.ruc}-${tipoDoc}-${serie.toUpperCase()}-${numero}.pdf` : null,
+        xml_path: Math.random() > 0.05 ? `/downloads/${emisor.ruc}-${tipoDoc}-${serie.toUpperCase()}-${numero}.xml` : null,
+        cdr_path: Math.random() > 0.3 ? `/downloads/${emisor.ruc}-${tipoDoc}-${serie.toUpperCase()}-${numero}.zip` : null
     };
 
     // Solo algunos documentos tienen CDR

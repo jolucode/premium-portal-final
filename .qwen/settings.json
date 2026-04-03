@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(dir)"
     ]
   },
   "$version": 3

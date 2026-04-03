@@ -6,6 +6,7 @@ const cors = require('cors');
 const ExcelJS = require('exceljs');
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -81,6 +82,7 @@ app.post('/api/login', async (req, res) => {
         const token = jwt.sign({ id: user._id, username: user.username, ruc: user.ruc_empresa, empresa: emp ? emp.razon_social : 'Empresa', role: user.role || 'user' }, process.env.JWT_SECRET, { expiresIn: '8h' });
         res.json({ token, user: { username: user.username, ruc: user.ruc_empresa, empresa: emp ? emp.razon_social : 'Empresa', logo: emp ? emp.logo : null, role: user.role || 'user' } });
     } catch (err) {
+        console.error('Error en login:', err);
         res.status(500).json({ error: 'Error interno' });
     }
 });
@@ -126,7 +128,7 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
 
         // Proyección para reducir datos transferidos
         const projection = {
-            tipo: 1, serie: 1, numero: 1, fecha: 1, monto: 1,
+            _id: 1, tipo: 1, serie: 1, numero: 1, fecha: 1, monto: 1,
             moneda: 1, estado: 1, ruc_emisor: 1, ruc_receptor: 1,
             pdf_path: 1, xml_path: 1, cdr_path: 1
         };
@@ -353,6 +355,74 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
         res.json({ message: 'OK' });
     } catch (err) {
         res.status(500).json({ error: 'Error al eliminar' });
+    }
+});
+
+// Download Route - serves PDF, XML, CDR files
+app.get('/api/documents/:id/download/:type', authenticateToken, async (req, res) => {
+    try {
+        const { id, type } = req.params;
+        
+        // Validate type
+        const validTypes = ['pdf', 'xml', 'cdr', 'zip'];
+        if (!validTypes.includes(type)) {
+            return res.status(400).json({ error: 'Tipo de archivo inválido' });
+        }
+
+        // Get document from database
+        const doc = await Documento.findById(id);
+        if (!doc) {
+            return res.status(404).json({ error: 'Documento no encontrado' });
+        }
+
+        // Verify user has access to this document (emisor or receptor)
+        if (doc.ruc_emisor !== req.user.ruc && doc.ruc_receptor !== req.user.ruc) {
+            return res.status(403).json({ error: 'No tienes acceso a este documento' });
+        }
+
+        // Check if file path exists in database
+        const pathField = `${type}_path`;
+        const filePath = doc[pathField];
+
+        if (!filePath) {
+            return res.status(404).json({ error: `Archivo ${type.toUpperCase()} no disponible` });
+        }
+
+        // Si la ruta ya es absoluta (ej: C:\clientes\...), usarla directamente
+        // Si es relativa (ej: /downloads/archivo.pdf), convertir a absoluta
+        let fullPath;
+        if (path.isAbsolute(filePath)) {
+            fullPath = filePath;
+        } else {
+            const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+            fullPath = path.join(__dirname, cleanPath);
+        }
+
+        if (!fs.existsSync(fullPath)) {
+            return res.status(404).json({
+                error: `Archivo no encontrado en: ${fullPath}`
+            });
+        }
+
+        // Obtener nombre del archivo para la descarga
+        const filename = path.basename(fullPath);
+
+        // Set appropriate content type
+        const contentTypes = {
+            pdf: 'application/pdf',
+            xml: 'application/xml',
+            cdr: 'application/zip',
+            zip: 'application/zip'
+        };
+
+        // Send file
+        res.setHeader('Content-Type', contentTypes[type]);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.sendFile(fullPath);
+
+    } catch (err) {
+        console.error('Error descargando archivo:', err);
+        res.status(500).json({ error: 'Error al descargar el archivo' });
     }
 });
 

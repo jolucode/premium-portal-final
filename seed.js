@@ -71,22 +71,31 @@ async function seed() {
             {
                 tipo: '01', serie: 'F001', numero: '00000001', fecha: new Date('2026-03-20'),
                 monto: 1500.00, moneda: 'PEN', ruc_emisor: '20510910517', ruc_receptor: '20445566778',
-                estado: 'Aceptado', pdf_path: '/downloads/F001-1.pdf', xml_path: '/downloads/F001-1.xml', cdr_path: '/downloads/F001-1.cdr'
+                estado: 'Aceptado', 
+                pdf_path: '/downloads/20510910517-01-F001-00000001.pdf', 
+                xml_path: '/downloads/20510910517-01-F001-00000001.xml', 
+                cdr_path: '/downloads/20510910517-01-F001-00000001.zip'
             },
             {
                 tipo: '03', serie: 'B001', numero: '00000123', fecha: new Date('2026-03-21'),
                 monto: 120.50, moneda: 'PEN', ruc_emisor: '20510910517', ruc_receptor: '10223344556',
-                estado: 'Aceptado', pdf_path: '/downloads/B001-123.pdf', xml_path: '/downloads/B001-123.xml'
+                estado: 'Aceptado', 
+                pdf_path: '/downloads/20510910517-03-B001-00000123.pdf', 
+                xml_path: '/downloads/20510910517-03-B001-00000123.xml'
             },
             {
                 tipo: '01', serie: 'F002', numero: '00000999', fecha: new Date('2026-03-22'),
                 monto: 8500.00, moneda: 'PEN', ruc_emisor: '20601234567', ruc_receptor: '20101112131',
-                estado: 'Aceptado', pdf_path: '/downloads/F002-999.pdf', xml_path: '/downloads/F002-999.xml', cdr_path: '/downloads/F002-999.cdr'
+                estado: 'Aceptado', 
+                pdf_path: '/downloads/20601234567-01-F002-00000999.pdf', 
+                xml_path: '/downloads/20601234567-01-F002-00000999.xml', 
+                cdr_path: '/downloads/20601234567-01-F002-00000999.zip'
             },
             {
                 tipo: '07', serie: 'FC02', numero: '00000005', fecha: new Date('2026-03-23'),
                 monto: 450.00, moneda: 'USD', ruc_emisor: '20601234567', ruc_receptor: '20556677889',
-                estado: 'Pendiente', xml_path: '/downloads/FC02-5.xml'
+                estado: 'Pendiente', 
+                xml_path: '/downloads/20601234567-07-FC02-00000005.xml'
             }
         ]);
         console.log('Documents seeded.');

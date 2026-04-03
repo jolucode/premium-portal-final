@@ -183,13 +183,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td data-label="Total" style="text-align:right"><strong>${doc.moneda} ${parseFloat(doc.monto).toFixed(2)}</strong></td>
                 <td data-label="Acciones">
                     <div class="action-btn-group">
-                        <button class="icon-btn icon-pdf" ${doc.pdf_path ? '' : 'disabled'} onclick="downloadFile('${doc.pdf_path}')" title="Descargar PDF">
+                        <button class="icon-btn icon-pdf" ${doc.pdf_path ? '' : 'disabled'} onclick="downloadFile('${doc._id}', 'pdf')" title="Descargar PDF">
                             <i class="fas fa-file-pdf"></i>
                         </button>
-                        <button class="icon-btn icon-xml" ${doc.xml_path ? '' : 'disabled'} onclick="downloadFile('${doc.xml_path}')" title="Descargar XML">
+                        <button class="icon-btn icon-xml" ${doc.xml_path ? '' : 'disabled'} onclick="downloadFile('${doc._id}', 'xml')" title="Descargar XML">
                             <i class="fas fa-file-code"></i>
                         </button>
-                        <button class="icon-btn icon-cdr" ${doc.cdr_path ? '' : 'disabled'} onclick="downloadFile('${doc.cdr_path}')" title="Descargar CDR">
+                        <button class="icon-btn icon-cdr" ${doc.cdr_path ? '' : 'disabled'} onclick="downloadFile('${doc._id}', 'cdr')" title="Descargar CDR">
                             <i class="fas fa-archive"></i>
                         </button>
                     </div>
@@ -299,12 +299,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-function downloadFile(path) {
-    if (!path || path === 'null') {
-        alert('Este archivo no está disponible.');
+async function downloadFile(docId, type) {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+        alert('Sesión expirada. Por favor inicia sesión nuevamente.');
+        window.location.href = 'login.html';
         return;
     }
-    alert(`Iniciando descarga de: ${path}\n(En un sistema real, esto abriría el archivo o descargaría el blob)`);
+
+    try {
+        const response = await fetch(`/api/documents/${docId}/download/${type}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            alert('No tienes permiso para descargar este archivo.');
+            return;
+        }
+
+        if (response.status === 404) {
+            const errorData = await response.json().catch(() => ({}));
+            alert(`Archivo no disponible: ${errorData.error || 'El archivo no existe en el servidor'}`);
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error('Error al descargar el archivo');
+        }
+
+        // Get filename from Content-Disposition header
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = `documento.${type}`;
+        if (disposition) {
+            const match = disposition.match(/filename="(.+)"/);
+            if (match) filename = match[1];
+        }
+
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+        console.error('Error descargando archivo:', err);
+        alert('Error al descargar el archivo. Por favor intenta nuevamente.');
+    }
 }
 
 function logout() {
