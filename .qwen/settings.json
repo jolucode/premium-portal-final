@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm *)",
       "Bash(node *)",
-      "Bash(dir)"
+      "Bash(dir)",
+      "Bash(del *)"
     ]
   },
   "$version": 3
