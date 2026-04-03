@@ -359,15 +359,13 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
 // --- CONFIGURACIÓN DE ARRANQUE ---
 const PORT = process.env.PORT || 3000;
 
-// FORZAR MONGO LOCAL PARA PRUEBAS DE PERFORMANCE
-const MONGO_URI = 'mongodb://127.0.0.1:27017/premium_portal';
+// Usar MONGO_URI del .env (Atlas en producción, local en desarrollo)
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/premium_portal';
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
     console.log(`📡 Conectando a: ${MONGO_URI}`);
-    if (MONGO_URI) {
-        mongoose.connect(MONGO_URI)
-            .then(() => console.log('✅ Conectado a Atlas'))
-            .catch(err => console.error('❌ Error Atlas:', err));
-    }
+    mongoose.connect(MONGO_URI)
+        .then(() => console.log('✅ MongoDB conectado'))
+        .catch(err => console.error('❌ Error MongoDB:', err));
 });
