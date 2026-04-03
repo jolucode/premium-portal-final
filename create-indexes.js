@@ -19,7 +19,8 @@ const DocumentoSchema = new mongoose.Schema({
 const Documento = mongoose.model('Documento', DocumentoSchema);
 
 async function createIndexes() {
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27014/premium_portal';
+    // Forzar MongoDB local
+    const MONGO_URI = 'mongodb://127.0.0.1:27017/premium_portal';
 
     try {
         console.log('📡 Conectando a MongoDB...\n');

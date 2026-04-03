@@ -16,7 +16,8 @@ const DocumentoSchema = new mongoose.Schema({
 const Documento = mongoose.model('Documento', DocumentoSchema);
 
 async function testPerformance() {
-    const MONGO_URI = process.env.MONGO_URI;
+    // Forzar MongoDB local
+    const MONGO_URI = 'mongodb://127.0.0.1:27017/premium_portal';
 
     try {
         console.log('📡 Conectando a MongoDB...\n');

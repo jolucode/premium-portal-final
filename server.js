@@ -56,6 +56,12 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
+// Count aproximado: trae docs con limit y cuenta (no escanea todo)
+async function getApproxCount(Model, filter, maxCount = 10000) {
+    const docs = await Model.find(filter, { _id: 1 }).limit(maxCount + 1);
+    return docs.length > maxCount ? maxCount : docs.length;
+}
+
 // Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
@@ -84,70 +90,91 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
     const ruc = req.user.ruc;
     const { tipo, search, estado, fechaDesde, fechaHasta, page = 1, limit = 50 } = req.query;
     try {
-        // Optimización: Separar consultas por emisor y receptor para usar índices
-        let baseFilterEmisor = { ruc_emisor: ruc };
-        let baseFilterReceptor = { ruc_receptor: ruc };
-        
-        if (tipo) {
-            baseFilterEmisor.tipo = tipo;
-            baseFilterReceptor.tipo = tipo;
-        }
-        if (estado) {
-            baseFilterEmisor.estado = estado;
-            baseFilterReceptor.estado = estado;
-        }
-
-        // Filtro de fechas
-        if (fechaDesde || fechaHasta) {
-            const fechaFilter = {};
-            if (fechaDesde) fechaFilter.$gte = new Date(fechaDesde + 'T00:00:00.000Z');
-            if (fechaHasta) fechaFilter.$lte = new Date(fechaHasta + 'T23:59:59.999Z');
-            baseFilterEmisor.fecha = { ...fechaFilter };
-            baseFilterReceptor.fecha = { ...fechaFilter };
-        }
-
-        // Búsqueda inteligente de Serie y Número
-        if (search) {
-            const parts = search.split('-');
-            if (parts.length === 2) {
-                // Caso: "F001-0001" - Búsqueda exacta por serie y número
-                const seriePattern = '^' + parts[0].replace(/[^a-zA-Z0-9]/g, '');
-                const numeroPattern = '^' + parts[1].replace(/[^0-9]/g, '');
-                baseFilterEmisor.serie = { $regex: seriePattern, $options: 'i' };
-                baseFilterEmisor.numero = { $regex: numeroPattern, $options: 'i' };
-                baseFilterReceptor.serie = { $regex: seriePattern, $options: 'i' };
-                baseFilterReceptor.numero = { $regex: numeroPattern, $options: 'i' };
-            } else {
-                // Caso: Solo "F001" o solo "1" - Búsqueda en ambos campos
-                const cleanSearch = search.replace(/[^a-zA-Z0-9]/g, '');
-                const searchFilter = {
-                    $or: [
-                        { serie: { $regex: '^' + cleanSearch, $options: 'i' } },
-                        { numero: { $regex: '^' + cleanSearch, $options: 'i' } }
-                    ]
-                };
-                baseFilterEmisor = { ...baseFilterEmisor, ...searchFilter };
-                baseFilterReceptor = { ...baseFilterReceptor, ...searchFilter };
-            }
-        }
-
-        // Paginación
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
 
-        // Ejecutar consultas separadas y unir resultados
-        const [docsEmisor, docsReceptor, totalEmisor, totalReceptor] = await Promise.all([
-            Documento.find(baseFilterEmisor).sort({ fecha: -1 }).skip(skip).limit(limitNum),
-            Documento.find(baseFilterReceptor).sort({ fecha: -1 }).skip(skip).limit(limitNum),
-            Documento.countDocuments(baseFilterEmisor),
-            Documento.countDocuments(baseFilterReceptor)
+        // Función para construir filtro base
+        function buildFilter(target) {
+            const filter = target === 'emisor' ? { ruc_emisor: ruc } : { ruc_receptor: ruc };
+            if (tipo) filter.tipo = tipo;
+            if (estado) filter.estado = estado;
+            if (fechaDesde || fechaHasta) {
+                filter.fecha = {};
+                if (fechaDesde) filter.fecha.$gte = new Date(fechaDesde + 'T00:00:00.000Z');
+                if (fechaHasta) filter.fecha.$lte = new Date(fechaHasta + 'T23:59:59.999Z');
+            }
+            return filter;
+        }
+
+        // Agregar filtros de búsqueda
+        function addSearchFilter(filter) {
+            if (!search) return filter;
+            const parts = search.split('-');
+            if (parts.length === 2) {
+                filter.serie = { $regex: '^' + parts[0].replace(/[^a-zA-Z0-9]/g, '') };
+                filter.numero = { $regex: '^' + parts[1].replace(/[^0-9]/g, '') };
+            } else {
+                const cleanSearch = search.replace(/[^a-zA-Z0-9]/g, '');
+                filter.$or = [
+                    { serie: { $regex: '^' + cleanSearch } },
+                    { numero: { $regex: '^' + cleanSearch } }
+                ];
+            }
+            return filter;
+        }
+
+        // Proyección para reducir datos transferidos
+        const projection = {
+            tipo: 1, serie: 1, numero: 1, fecha: 1, monto: 1,
+            moneda: 1, estado: 1, ruc_emisor: 1, ruc_receptor: 1,
+            pdf_path: 1, xml_path: 1, cdr_path: 1
+        };
+
+        // Construir filtros separados
+        const filterEmisor = addSearchFilter(buildFilter('emisor'));
+        const filterReceptor = addSearchFilter(buildFilter('receptor'));
+
+        // Optimización de count: estrategia según tipo de consulta
+        let total;
+        const hasFilters = tipo || estado || fechaDesde || fechaHasta || search;
+        const hasSearch = !!search;
+
+        if (!hasFilters) {
+            // Sin filtros: metadata instantánea
+            total = await Documento.estimatedDocumentCount();
+        } else if (hasSearch) {
+            // Con búsqueda de texto: count exacto (pocos resultados)
+            const [totalEmisor, totalReceptor] = await Promise.all([
+                Documento.countDocuments(filterEmisor),
+                Documento.countDocuments(filterReceptor)
+            ]);
+            total = totalEmisor + totalReceptor;
+        } else {
+            // Con filtros normales (tipo/estado/fecha): count aproximado
+            // Para evitar escanear millones de documentos
+            const [totalEmisor, totalReceptor] = await Promise.all([
+                getApproxCount(Documento, filterEmisor),
+                getApproxCount(Documento, filterReceptor)
+            ]);
+            total = totalEmisor + totalReceptor;
+        }
+
+        // Documentos en paralelo
+        // Limitar skip máximo para evitar escaneo excesivo
+        const maxSkip = 10000;
+        const effectiveSkip = Math.min(skip, maxSkip);
+        
+        const [docsEmisor, docsReceptor] = await Promise.all([
+            Documento.find(filterEmisor, projection).sort({ fecha: -1 }).skip(effectiveSkip).limit(limitNum),
+            Documento.find(filterReceptor, projection).sort({ fecha: -1 }).skip(effectiveSkip).limit(limitNum)
         ]);
 
-        // Combinar y deduplicar resultados
-        const allDocs = [...docsEmisor, ...docsReceptor];
-        const total = totalEmisor + totalReceptor;
+        // Combinar y limitar al límite solicitado
+        const allDocs = [...docsEmisor, ...docsReceptor].slice(0, limitNum);
 
+        const maxPaginas = Math.ceil(maxSkip / limitNum);
+        
         res.json({
             documentos: allDocs,
             paginacion: {
@@ -156,7 +183,10 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
                 total: total,
                 totalPaginas: Math.ceil(total / limitNum),
                 tieneAnterior: pageNum > 1,
-                tieneSiguiente: pageNum < Math.ceil(total / limitNum)
+                tieneSiguiente: pageNum < Math.ceil(total / limitNum),
+                aproximado: hasFilters && !hasSearch,
+                skipLimitado: skip > maxSkip,
+                maxPaginas: maxPaginas
             }
         });
     } catch (err) {
@@ -168,7 +198,7 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
 app.get('/api/documents/export', authenticateToken, async (req, res) => {
     const ruc = req.user.ruc;
     const { tipo, search, estado, fechaDesde, fechaHasta } = req.query;
-    
+
     // Límite máximo de exportación para evitar sobrecarga
     const MAX_EXPORT = 10000;
 
@@ -184,34 +214,39 @@ app.get('/api/documents/export', authenticateToken, async (req, res) => {
             if (fechaHasta) filter.fecha.$lte = new Date(fechaHasta + 'T23:59:59.999Z');
         }
 
-        // Búsqueda inteligente de Serie y Número
+        // Búsqueda optimizada (sin $options:'i')
         if (search) {
             const parts = search.split('-');
             if (parts.length === 2) {
-                // Caso: "F001-0001" - Búsqueda exacta por serie y número
-                filter.serie = { $regex: '^' + parts[0].replace(/[^a-zA-Z0-9]/g, ''), $options: 'i' };
-                filter.numero = { $regex: '^' + parts[1].replace(/[^0-9]/g, ''), $options: 'i' };
+                filter.serie = { $regex: '^' + parts[0].replace(/[^a-zA-Z0-9]/g, '') };
+                filter.numero = { $regex: '^' + parts[1].replace(/[^0-9]/g, '') };
             } else {
-                // Caso: Solo "F001" o solo "1" - Búsqueda en ambos campos
                 const cleanSearch = search.replace(/[^a-zA-Z0-9]/g, '');
-                filter.$or = [
-                    { serie: { $regex: '^' + cleanSearch, $options: 'i' } },
-                    { numero: { $regex: '^' + cleanSearch, $options: 'i' } }
+                delete filter.$or;
+                filter.$and = [
+                    { $or: [{ ruc_emisor: ruc }, { ruc_receptor: ruc }] },
+                    { $or: [
+                        { serie: { $regex: '^' + cleanSearch } },
+                        { numero: { $regex: '^' + cleanSearch } }
+                    ]}
                 ];
             }
         }
 
         // Contar total para verificar límite
         const total = await Documento.countDocuments(filter);
-        
+
         if (total > MAX_EXPORT) {
-            return res.status(400).json({ 
-                error: `Demasiados documentos para exportar (${total.toLocaleString()}). Por favor aplica más filtros (fecha, tipo, estado) para reducir a máximo ${MAX_EXPORT.toLocaleString()} documentos.` 
+            return res.status(400).json({
+                error: `Demasiados documentos para exportar (${total.toLocaleString()}). Por favor aplica más filtros (fecha, tipo, estado) para reducir a máximo ${MAX_EXPORT.toLocaleString()} documentos.`
             });
         }
 
-        // Obtener TODOS los documentos (sin paginación)
-        const docs = await Documento.find(filter).sort({ fecha: -1 }).limit(MAX_EXPORT);
+        // Obtener TODOS los documentos (sin paginación) con proyección
+        const docs = await Documento.find(filter, {
+            tipo: 1, serie: 1, numero: 1, fecha: 1, monto: 1,
+            moneda: 1, estado: 1, ruc_emisor: 1, ruc_receptor: 1
+        }).sort({ fecha: -1 }).limit(MAX_EXPORT);
 
         // Crear libro de Excel
         const workbook = new ExcelJS.Workbook();
@@ -323,10 +358,13 @@ app.delete('/api/users/:id', authenticateToken, isAdmin, async (req, res) => {
 
 // --- CONFIGURACIÓN DE ARRANQUE ---
 const PORT = process.env.PORT || 3000;
-const MONGO_URI = process.env.MONGO_URI;
+
+// FORZAR MONGO LOCAL PARA PRUEBAS DE PERFORMANCE
+const MONGO_URI = 'mongodb://127.0.0.1:27017/premium_portal';
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
+    console.log(`📡 Conectando a: ${MONGO_URI}`);
     if (MONGO_URI) {
         mongoose.connect(MONGO_URI)
             .then(() => console.log('✅ Conectado a Atlas'))
